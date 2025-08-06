@@ -1,50 +1,60 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine
+from models import Base, Trajectory
+import time
 import os
-
 import uvicorn
+
+# --- Initialize database ---
+Base.metadata.create_all(bind=engine)
 
 # --- Setup FastAPI ---
 app = FastAPI()
-
-# --- Setup DB ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = f"sqlite:///{os.path.join(BASE_DIR, 'app.db')}"
-
-engine = create_engine(DB_PATH, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# --- DB Model ---
-class Person(Base):
-    __tablename__ = "people"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String)
-
-Base.metadata.create_all(bind=engine)
-
-# --- HTML Templates ---
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --- Route ---
+# --- Routes ---
+
 @app.get("/test")
-def root():
-    return {"message": "Hello from FastAPI on Render! piyushpatelcodes"}
+def test():
+    return {"message": "Hello from FastAPI piyushpatelcodes"}
 
 @app.get("/", response_class=HTMLResponse)
-def read_root(request: Request):
-    db = SessionLocal()
-    
-    # Seed DB if empty
-    if db.query(Person).count() == 0:
-        db.add_all([Person(name="Alice"), Person(name="Bob"), Person(name="Charlie")])
-        db.commit()
+def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
-    people = db.query(Person).all()
-    return templates.TemplateResponse("index.html", {"request": request, "people": people})
+@app.post("/api/plan")
+def plan_coverage(
+    request: Request,
+    wall_width: int = Form(...),
+    wall_height: int = Form(...),
+    obs_x: int = Form(...),
+    obs_y: int = Form(...),
+    obs_w: int = Form(...),
+    obs_h: int = Form(...)
+):
+    start = time.time()
+    path = []
+
+    for y in range(wall_height):
+        for x in range(wall_width):
+            if obs_x <= x < obs_x + obs_w and obs_y <= y < obs_y + obs_h:
+                continue
+            path.append((x, y))
+
+    db: Session = SessionLocal()
+    for idx, (x, y) in enumerate(path):
+        db.add(Trajectory(x=x, y=y, step=idx))
+    db.commit()
+    db.close()
+
+    elapsed = round(time.time() - start, 3)
+    return {"steps": len(path), "time": elapsed}
+
 
 
 if __name__ == "__main__":

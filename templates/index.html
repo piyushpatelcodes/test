@@ -1,14 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>People from DB</title>
+  <title>Wall Coverage Planner</title>
+  <style>
+    .grid { display: grid; margin: 20px auto; }
+    .cell {
+      width: 20px; height: 20px;
+      border: 1px solid #ccc;
+      background: #e0f7fa;
+    }
+    .obstacle { background: #ef5350; }
+    .path { background: #4caf50; }
+  </style>
 </head>
 <body>
-    <h1>People in Database</h1>
-    <ul>
-        {% for person in people %}
-        <li>{{ person.name }}</li>
-        {% endfor %}
-    </ul>
+  <h2>Wall Coverage Planner</h2>
+  <form method="post" action="/api/plan">
+    <label>Wall Width: <input name="wall_width" type="number" value="10" /></label><br/>
+    <label>Wall Height: <input name="wall_height" type="number" value="10" /></label><br/>
+    <label>Obstacle X: <input name="obs_x" type="number" value="3" /></label><br/>
+    <label>Obstacle Y: <input name="obs_y" type="number" value="3" /></label><br/>
+    <label>Obstacle Width: <input name="obs_w" type="number" value="2" /></label><br/>
+    <label>Obstacle Height: <input name="obs_h" type="number" value="2" /></label><br/>
+    <button type="submit">Plan Path</button>
+  </form>
+
+  <p>Path and obstacle grid will render after planning in next version.</p>
 </body>
 </html>

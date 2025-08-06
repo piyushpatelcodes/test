@@ -3,3 +3,5 @@ myenv
 /__pycache__
 /myenv
 app.db
+robot.db
+/robot.db
