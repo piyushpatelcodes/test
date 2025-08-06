@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>People from DB</title>
+</head>
+<body>
+    <h1>People in Database</h1>
+    <ul>
+        {% for person in people %}
+        <li>{{ person.name }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
