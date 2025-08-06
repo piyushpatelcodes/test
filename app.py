@@ -5,6 +5,8 @@ from sqlalchemy import Column, Integer, String, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 
+import uvicorn
+
 # --- Setup FastAPI ---
 app = FastAPI()
 
@@ -28,6 +30,10 @@ Base.metadata.create_all(bind=engine)
 templates = Jinja2Templates(directory="templates")
 
 # --- Route ---
+@app.get("/test")
+def root():
+    return {"message": "Hello from FastAPI on Render! piyushpatelcodes"}
+
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
     db = SessionLocal()
@@ -39,3 +45,8 @@ def read_root(request: Request):
 
     people = db.query(Person).all()
     return templates.TemplateResponse("index.html", {"request": request, "people": people})
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))  # Render sets PORT
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
