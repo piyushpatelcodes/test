@@ -1,30 +1,878 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>Wall Coverage Planner</title>
-  <style>
-    .grid { display: grid; margin: 20px auto; }
-    .cell {
-      width: 20px; height: 20px;
-      border: 1px solid #ccc;
-      background: #e0f7fa;
-    }
-    .obstacle { background: #ef5350; }
-    .path { background: #4caf50; }
-  </style>
-</head>
-<body>
-  <h2>Wall Coverage Planner</h2>
-  <form method="post" action="/api/plan">
-    <label>Wall Width: <input name="wall_width" type="number" value="10" /></label><br/>
-    <label>Wall Height: <input name="wall_height" type="number" value="10" /></label><br/>
-    <label>Obstacle X: <input name="obs_x" type="number" value="3" /></label><br/>
-    <label>Obstacle Y: <input name="obs_y" type="number" value="3" /></label><br/>
-    <label>Obstacle Width: <input name="obs_w" type="number" value="2" /></label><br/>
-    <label>Obstacle Height: <input name="obs_h" type="number" value="2" /></label><br/>
-    <button type="submit">Plan Path</button>
-  </form>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Wall Finishing Robot - SaaS</title>
+    <link rel="stylesheet" href="/static/style.css" />
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
 
-  <p>Path and obstacle grid will render after planning in next version.</p>
-</body>
+    <style>
+      /* === Base Reset === */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #023D31;
+        color: #fff;
+        min-height: 100vh;
+        padding: 40px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      h1 {
+        font-size: 2.8rem;
+        margin-bottom: 30px;
+        font-weight: bold;
+        text-align: center;
+        color: #e2fbea;
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      /* === SaaS-style Card === */
+      form {
+        background-color: #ffffff;
+        color: #333;
+        border-radius: 12px;
+        padding: 30px;
+        max-width: 600px;
+        width: 100%;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+        margin-bottom: 40px;
+      }
+
+      form label {
+        font-weight: 600;
+        display: block;
+        margin-top: 15px;
+        margin-bottom: 5px;
+      }
+
+      form input {
+        padding: 10px;
+        width: 100%;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        font-size: 15px;
+      }
+
+      form button {
+        background-color: #198754;
+        color: white;
+        border: none;
+        padding: 14px 25px;
+        border-radius: 8px;
+        font-size: 16px;
+        margin-top: 25px;
+        cursor: pointer;
+        transition: background 0.3s ease;
+        width: 100%;
+      }
+
+      form button:hover {
+        background-color: #146c43;
+      }
+
+      /* === Grid Display === */
+  #grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 25px);
+  justify-content: center;
+  margin: 20px auto;
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+
+      .cell {
+        width: 25px;
+        height: 25px;
+        border: 1px solid #ddd;
+        box-sizing: border-box;
+        transition: background-color 0.2s ease-in-out;
+        background-color: #fff;
+      }
+
+      .cell.obstacle {
+        background-color: #6c757d;
+      }
+
+      .cell.path {
+        background-color: #28a745;
+      }
+
+      .cell.current {
+  background-color: #ffd60a !important;
+  border: 2px solid #fff;
+  animation: pulse-glow 0.8s infinite ease-in-out;
+}
+
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 0px rgba(255, 214, 10, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 10px 4px rgba(255, 214, 10, 1);
+  }
+  100% {
+    box-shadow: 0 0 0px rgba(255, 214, 10, 0.6);
+  }
+}
+
+      #playBtn {
+        margin-top: 25px;
+        padding: 12px 25px;
+        font-size: 16px;
+        background-color: #20c997;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      #playBtn:hover:not(:disabled) {
+        background-color: #198754;
+      }
+
+      #playBtn:disabled {
+        background-color: #adb5bd;
+        cursor: not-allowed;
+      }
+
+      @media (max-width: 600px) {
+        form {
+          padding: 20px;
+        }
+        h1 {
+          font-size: 2rem;
+        }
+      }
+
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', Arial, sans-serif;
+      box-sizing: border-box;
+      background: radial-gradient(ellipse 80% 50% at 50% 90%, #277330bb 0%, #052021 100%);
+      color: #fff;
+      min-height: 100vh;
+      width: 100vw;
+      overflow-x: hidden;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      justify-content: flex-start;
+      align-items: center;
+    }
+    /* NAVBAR */
+    .navbar {
+      width: 100vw;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 10;
+      background: transparent;
+      padding-top: 1.2rem;
+    }
+    .navbar-inner {
+      width: 100%;
+      max-width: 980px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(140deg, #b7fc38 70%, #90e256 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin-right: 3px;
+    }
+   
+    /* Book a Call nav */
+    .nav-call {
+      font-weight: 600;
+      color: #fff;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+      padding: 8px 18px;
+      background: rgba(170,255,184,0.01);
+      border-radius: 18px;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.2s;
+    }
+    .nav-call:hover {
+      background: rgba(100,255,100,0.1);
+    }
+
+    /* Main section */
+    .main-container {
+      width: 100vw;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      /* margin-top: 112px; */
+    }
+    /* "Open for projects" */
+    .status {
+      margin-top: 38px;
+      margin-bottom: 16px;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: #b8ffc0;
+      background: rgba(30,60,30,0.16);
+      padding: 3px 17px 4px 8px;
+      border-radius: 20px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      box-shadow: 0 4px 24px 0 rgba(38,88,54,0.1);
+      width: max-content;
+    }
+    .status-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: linear-gradient(120deg, #b8fc38 65%, #3deb3a 100%);
+      margin-right: 3px;
+      box-shadow: 0 0 12px #58f984cc;
+      border: 2px solid #194f19;
+    }
+    /* Heading */
+    .main-heading {
+      font-size: 3.3rem;
+      font-weight: 700;
+      line-height: 1.08;
+      letter-spacing: -1.4px;
+      text-align: center;
+      margin: 0 0 14px 0;
+      margin-top: 0;
+      color: #fff;
+      text-shadow: "0 4px 18px #154d2555a";
+    }
+    .main-heading br {
+      display: none;
+    }
+    @media (min-width: 430px) {
+      .main-heading br {
+        display: inline;
+      }
+    }
+    /* Subheading */
+    .main-subheading {
+      text-align: center;
+      font-size: 1.09rem;
+      color: #d4fcd7;
+      margin-bottom: 36px;
+      margin-top: 0;
+      font-weight: 400;
+      line-height: 1.56;
+      letter-spacing: 0.01em;
+      text-shadow: 0 2px 20px #194f1943;
+    }
+    /* CTA Button */
+  .cta-btn {
+  margin: 0 auto 12px auto;
+  display: block;
+  padding: 13px 34px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  border-radius: 12px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  border: 1px solid rgba(0, 96, 29, 0.458);
+
+
+  /* Subtle gradient for glassy depth */
+  background-image: linear-gradient(135deg, rgba(33, 133, 5, 0.839), rgba(117, 235, 139, 0.523));
+
+  /* Text + shadow */
+  color: #ffffff;
+
+
+  transition: all 0.3s ease-in-out;
+}
+
+.cta-btn:hover {
+  background: rgba(23, 197, 7, 0.66);
+ 
+}
+
+#feature {
+  width: 100%;
+  max-width: 980px;
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+ #graph {
+    width: 500px;
+    height: 500px;
+    position: relative;
+    margin-top: 20px;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    background: #f4f7fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.2);
+    position: relative;
+  }
+
+  /* Axis styles */
+  .axis-line {
+    position: absolute;
+    background-color: #333;
+  }
+
+  .horizontal-axis {
+    height: 2px;
+    width: 100%;
+    top: 50%;
+    left: 0;
+  }
+
+  .vertical-axis {
+    width: 2px;
+    height: 100%;
+    top: 0;
+    left: 50%;
+  }
+
+  /* Point styling */
+  .graph-point {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background-color: #28a745;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+  }
+
+  /* Trajectory line */
+  .graph-line {
+    position: absolute;
+    width: 2px;
+    background-color: #007bff;
+    transition: transform 0.3s ease-in-out;
+  }
+
+  /* Labeled grid (optional for better reference) */
+  .grid-line {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.1);
+    width: 1px;
+    height: 100%;
+  }
+  
+  .graph-labels {
+    position: absolute;
+    font-size: 12px;
+    color: #888;
+  }
+  
+  /* Label for each grid mark (on X and Y axis) */
+  .graph-labels span {
+    position: absolute;
+  }
+
+  .graph-labels .x-label {
+    bottom: -20px;
+  }
+
+  .graph-labels .y-label {
+    left: -20px;
+  }
+ 
+
+   footer {
+    background-color: #023D31;
+    color: white;
+    padding: 40px 20px;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .footer-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .footer-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .footer-logo h3 {
+    font-size: 1.6rem;
+    letter-spacing: 1px;
+  }
+
+  .footer-links {
+    margin-bottom: 20px;
+  }
+
+  .footer-links h4 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  .footer-links ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .footer-links ul li {
+    margin-bottom: 8px;
+  }
+
+  .footer-links ul li a {
+    color: #b8fc38;
+    text-decoration: none;
+    transition: color 0.3s ease;
+  }
+
+  .footer-links ul li a:hover {
+    color: #90e256;
+  }
+
+  .footer-info {
+    font-size: 14px;
+    color: #b8fc38;
+  }
+
+  .footer-info p {
+    margin: 5px 0;
+  }
+   
+    /* Responsive tweaks */
+    @media (max-width: 540px) {
+      .main-heading {
+        font-size: 2.1rem;
+        margin-bottom: 11px;
+      }
+      .main-subheading {
+        font-size: 1rem;
+      }
+      .navbar-inner {
+        padding: 0 14px;
+      }
+      .cta-btn {
+        padding: 12px 19px;
+        font-size: 1em;
+      }
+      .main-container {
+        margin-top: 90px;
+      }
+    }
+    </style>
+  </head>
+  <body>
+    <section id="main" class="main">
+
+         <nav class="navbar">
+    <div class="navbar-inner">
+     <div class="logo">
+  <div class="logo-icon">
+    <i class="bi bi-dpad-fill" style="color: rgb(7, 118, 25); font-size: 26px;"></i>
+  </div>
+</div>
+
+   
+      <div style="display: flex; align-items:center;">
+        <a class="nav-call" href="/docs">API Documentation &nbsp;→</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Section -->
+  <main class="main-container">
+    <div class="status">
+      <span class="status-dot"></span>
+      Project Submitted as Backend Intern
+    </div>
+    <h1 class="main-heading">
+      0 Guesswork<br>
+      Welcome To, WallPilot<br>
+      Path Planner.
+    </h1>
+    <p class="main-subheading">
+      We empower robotics teams and SaaS platforms with precision path planning,<br>
+  smart obstacle handling, and seamless real-time visualizations.
+    </p>
+    <a style="text-decoration: none;" href="#feature">
+
+        <button class="cta-btn">
+            See WallPilot in Action &nbsp;→
+        </button>
+    </a>
+  </main>
+    </section>
+    <section id="feature">
+
+    <h1>Wall Finishing Robot Path Planner</h1>
+
+    <form id="planForm">
+      <label>Wall Width (cells):</label>
+      <input type="number" name="wall_width" value="20" min="1" max="50" required />
+
+      <label>Wall Height (cells):</label>
+      <input type="number" name="wall_height" value="20" min="1" max="50" required />
+
+      <label>Obstacle X (start cell):</label>
+      <input type="number" name="obs_x" value="5" min="0" required />
+
+      <label>Obstacle Y (start cell):</label>
+      <input type="number" name="obs_y" value="5" min="0" required />
+
+      <label>Obstacle Width (cells):</label>
+      <input type="number" name="obs_w" value="5" min="1" required />
+
+      <label>Obstacle Height (cells):</label>
+      <input type="number" name="obs_h" value="5" min="1" required />
+
+      <button type="submit"><i class="bi bi-send"></i> Plan Coverage</button>
+      <label for="speedSlider">Playback Speed (ms per step):</label>
+<input type="range" id="speedSlider" min="10" max="500" value="50" step="10" />
+<span id="speedValue">This Take value in </span> ms
+
+    </form>
+    
+
+    <div id="grid"></div>
+    <button id="playBtn" disabled><i class="bi bi-play-fill"></i> Play Trajectory</button>
+        </section>
+
+        
+<footer>
+  <div class="footer-container">
+    <div class="footer-logo">
+      <div class="logo-icon">
+        <span class="bi bi-dpad-fill" style="color: #396f10;"></span>
+      </div>
+      <h3 style="color: white; letter-spacing: 1px;">WallPilot</h3>
+    </div>
+
+    <div class="footer-links">
+      <h4>API Endpoints</h4>
+      <ul>
+        <li><a href="/docs" target="_blank">API Documentation</a></li>
+        <li><a href="/test" target="_blank">Test Endpoint</a></li>
+        <li><a href="/" target="_blank">Home</a></li>
+        <li><a href="/api/plan" target="_blank">Plan Coverage (POST)</a></li>
+        <li><a href="/api/trajectory" target="_blank">Get Trajectories (GET)</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-info">
+      <p>FastAPI Version 0.1.0</p>
+      <p>&copy; 2025 WallPilot, All Rights Reserved</p>
+    </div>
+  </div>
+</footer>
+
+
+        <h1 style="margin: 2%;">Path Trajectory that above Program follows</h1>
+
+<div id="graph">
+  <!-- Horizontal and Vertical Axes -->
+  <div class="axis-line horizontal-axis"></div>
+  <div class="axis-line vertical-axis"></div>
+  
+  <!-- Grid lines (optional for clarity) -->
+  <div class="grid-line" style="left: 10%;"></div>
+  <div class="grid-line" style="left: 30%;"></div>
+  <div class="grid-line" style="left: 50%;"></div>
+  <div class="grid-line" style="left: 70%;"></div>
+  <div class="grid-line" style="left: 90%;"></div>
+  
+  <!-- Labels for the grid -->
+  <div class="graph-labels">
+    <span class="x-label" style="left: 10%;">1</span>
+    <span class="x-label" style="left: 30%;">2</span>
+    <span class="x-label" style="left: 50%;">3</span>
+    <span class="x-label" style="left: 70%;">4</span>
+    <span class="x-label" style="left: 90%;">5</span>
+  </div>
+  <div class="graph-labels">
+    <span class="y-label" style="top: 10%;">1</span>
+    <span class="y-label" style="top: 30%;">2</span>
+    <span class="y-label" style="top: 50%;">3</span>
+    <span class="y-label" style="top: 70%;">4</span>
+    <span class="y-label" style="top: 90%;">5</span>
+  </div>
+</div>
+
+
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script>
+    // Register plugin
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Timeline for on-load reveal
+    const tl = gsap.timeline({ defaults: { ease: "power2.out", duration: 0.8 } });
+
+    // Animate logo
+    tl.from(".logo-icon", { opacity: 0, scale: 0.5, y: -30 })
+
+      // Navbar button
+      .from(".nav-call", { opacity: 0, x: 40 }, "-=0.5")
+
+      // Status badge
+      .from(".status", { opacity: 0, y: 30 }, "-=0.3")
+
+      // Heading
+      .from(".main-heading", {
+        opacity: 0, y: 40,
+        skewY: 2
+      }, "-=0.3")
+
+      // Subheading
+      .from(".main-subheading", {
+        opacity: 0, y: 30
+      }, "-=0.5")
+
+
+    // ScrollTrigger demo: CTA button 'pulses' when scrolled into view
+    gsap.to(".cta-btn", {
+      scale: 1.09,
+      boxShadow: "0 0 21px #b8fc3890",
+      repeat: 1,
+      yoyo: true,
+      duration: 0.38,
+      scrollTrigger: {
+        trigger: ".cta-btn",
+        start: "top 85%",
+        toggleActions: "play none none none"
+      }
+    });
+  </script>
+
+    <script>
+      const gridEl = document.getElementById("grid");
+      let wallWidth = 20;
+      let wallHeight = 20;
+      let obstacles = [];
+      let trajectory = [];
+      let currentStep = 0;
+      let playInterval;
+
+      function createGrid() {
+        gridEl.style.gridTemplateColumns = `repeat(${wallWidth}, 25px)`;
+        gridEl.style.gridTemplateRows = `repeat(${wallHeight}, 25px)`;
+        gridEl.innerHTML = "";
+
+        for (let y = 0; y < wallHeight; y++) {
+          for (let x = 0; x < wallWidth; x++) {
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
+            cell.id = `cell-${x}-${y}`;
+            gridEl.appendChild(cell);
+          }
+        }
+      }
+
+      function markObstacles() {
+        obstacles.forEach((obs) => {
+          for (let y = obs.y; y < obs.y + obs.h; y++) {
+            for (let x = obs.x; x < obs.x + obs.w; x++) {
+              const cell = document.getElementById(`cell-${x}-${y}`);
+              if (cell) cell.classList.add("obstacle");
+            }
+          }
+        });
+      }
+
+      function markTrajectory() {
+        trajectory.forEach((point) => {
+          const cell = document.getElementById(`cell-${point.x}-${point.y}`);
+          if (cell && !cell.classList.contains("obstacle")) {
+            cell.classList.add("path");
+          }
+        });
+      }
+
+      function clearCurrentStep() {
+        if (currentStep > 0) {
+          const prevPoint = trajectory[currentStep - 1];
+          const prevCell = document.getElementById(`cell-${prevPoint.x}-${prevPoint.y}`);
+          if (prevCell) {
+            prevCell.classList.remove("current");
+            if (!prevCell.classList.contains("obstacle")) {
+              prevCell.classList.add("path");
+            }
+          }
+        }
+      }
+
+      function showCurrentStep() {
+        if (currentStep < trajectory.length) {
+          const point = trajectory[currentStep];
+          const cell = document.getElementById(`cell-${point.x}-${point.y}`);
+          if (cell) {
+            cell.classList.remove("path");
+            cell.classList.add("current");
+          }
+        }
+      }
+
+      function playTrajectory() {
+        if (currentStep >= trajectory.length) {
+          clearInterval(playInterval);
+          document.getElementById("playBtn").disabled = false;
+          return;
+        }
+        clearCurrentStep();
+        showCurrentStep();
+        currentStep++;
+      }
+
+      document.getElementById("planForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        wallWidth = parseInt(e.target.wall_width.value);
+        wallHeight = parseInt(e.target.wall_height.value);
+        const obs_x = parseInt(e.target.obs_x.value);
+        const obs_y = parseInt(e.target.obs_y.value);
+        const obs_w = parseInt(e.target.obs_w.value);
+        const obs_h = parseInt(e.target.obs_h.value);
+
+        currentStep = 0;
+        trajectory = [];
+        obstacles = [{ x: obs_x, y: obs_y, w: obs_w, h: obs_h }];
+        createGrid();
+        markObstacles();
+
+        const formData = new FormData(e.target);
+        const response = await fetch("/api/plan", {
+          method: "POST",
+          body: formData,
+        });
+        await response.json();
+
+        const trajResponse = await fetch("/api/trajectory");
+        trajectory = await trajResponse.json();
+
+        markTrajectory();
+        document.getElementById("playBtn").disabled = false;
+      });
+
+     document.getElementById("playBtn").addEventListener("click", () => {
+  document.getElementById("playBtn").disabled = true;
+  currentStep = 0;
+
+  const speed = parseInt(document.getElementById("speedSlider").value);
+  playInterval = setInterval(playTrajectory, speed);
+});
+
+
+      createGrid();
+    </script>
+<script>
+  async function fetchTrajectoryData() {
+    try {
+      const response = await fetch("/api/trajectory");
+      const data = await response.json();
+      plotTrajectoryGraph(data);
+    } catch (error) {
+      console.error('Error fetching trajectory data:', error);
+    }
+  }
+
+  function plotTrajectoryGraph(trajectory) {
+    trajectory.forEach((point, index) => {
+      const { x, y } = point;
+
+      // Plot trajectory points on the graph
+      plotPointOnGraph(x, y);
+
+      if (index > 0) {
+        const prevPoint = trajectory[index - 1];
+        plotLineOnGraph(prevPoint, point);
+      }
+    });
+  }
+
+  // Plot a point on the graph with a clear style
+  function plotPointOnGraph(x, y) {
+    const point = document.createElement('div');
+    point.classList.add('graph-point');
+    point.style.left = `${x * 40 + 15}px`;  // Adjust scaling to make the grid more readable
+    point.style.top = `${y * 40 + 15}px`;
+    document.getElementById('graph').appendChild(point);
+  }
+
+  // Plot a line connecting two points with better styling
+  function plotLineOnGraph(prevPoint, currentPoint) {
+    const line = document.createElement('div');
+    line.classList.add('graph-line');
+    
+    const prevX = prevPoint.x * 40 + 15;
+    const prevY = prevPoint.y * 40 + 15;
+    const currX = currentPoint.x * 40 + 15;
+    const currY = currentPoint.y * 40 + 15;
+
+    const dx = currX - prevX;
+    const dy = currY - prevY;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+    line.style.width = `${length}px`;
+    line.style.height = `2px`;
+    line.style.left = `${prevX}px`;
+    line.style.top = `${prevY}px`;
+    line.style.transformOrigin = '0 0';
+    line.style.transform = `rotate(${angle}deg)`;
+
+    document.getElementById('graph').appendChild(line);
+  }
+
+  fetchTrajectoryData();
+</script>
+  </body>
 </html>

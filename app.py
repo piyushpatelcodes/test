@@ -5,12 +5,23 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
 from models import Base, Trajectory
+from fastapi import Depends
+from typing import List
+from pydantic import BaseModel
 import time
 import os
 import uvicorn
 
 # --- Initialize database ---
 Base.metadata.create_all(bind=engine)
+class TrajectorySchema(BaseModel):
+    id: int
+    x: int
+    y: int
+    step: int
+
+    class Config:
+        orm_mode = True
 
 # --- Setup FastAPI ---
 app = FastAPI()
@@ -21,7 +32,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/test")
 def test():
-    return {"message": "Hello from FastAPI piyushpatelcodes"}
+    return {"message": "Hello from FastAPI WallPilot"}
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
@@ -55,6 +66,17 @@ def plan_coverage(
     elapsed = round(time.time() - start, 3)
     return {"steps": len(path), "time": elapsed}
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@app.get("/api/trajectory", response_model=List[TrajectorySchema])
+def get_trajectories(db: Session = Depends(get_db)):
+    trajectories = db.query(Trajectory).order_by(Trajectory.step).all()
+    return trajectories
 
 
 if __name__ == "__main__":
